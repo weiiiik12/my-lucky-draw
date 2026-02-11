@@ -1,1 +1,0 @@
-# my-lucky-draw
