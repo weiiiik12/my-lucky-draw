@@ -2,71 +2,123 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>☁️ 雲端幸運抽抽樂 V2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🌟 Hago 獎勵系統</title>
+    
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     
     <style>
-        /* (樣式保持跟之前差不多，增加登入頁) */
-        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-bottom: 70px; }
-        .page { display: none; padding: 20px; }
-        .page.active { display: block; }
-        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
-        .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 20px; width: 80%; margin: 5px auto; display: block; cursor: pointer; }
-        .btn-blue { background: #2196F3; }
-        .input-box { padding: 10px; width: 70%; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        .navbar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; padding: 10px 0; border-top: 1px solid #ddd; }
-        .nav-item { flex: 1; text-align: center; cursor: pointer; color: #777; }
-        .nav-item.active { color: #4CAF50; font-weight: bold; }
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --primary: #4CAF50;
+            --danger: #ff4757;
+            --text: #2f3542;
+        }
+        /* 稀有度顏色定義 */
+        .rank-common { color: #57606f; background: #dfe4ea; border-color: #ced6e0; }
+        .rank-rare { color: #1e90ff; background: #dff9fb; border-color: #70a1ff; }
+        .rank-epic { color: #a55eea; background: #f3e5f5; border-color: #d980fa; }
+        .rank-legendary { color: #ffa502; background: #fff3cd; border-color: #ffeaa7; box-shadow: 0 0 10px rgba(255, 165, 2, 0.4); }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text); margin: 0; padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
         
-        /* 載入遮罩 */
-        #loadingOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 999; display: flex; justify-content: center; align-items: center; font-size: 20px; display: none; }
+        .header { background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; padding: 20px; text-align: center; border-radius: 0 0 20px 20px; box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3); }
+        .points-box { font-size: 2.5em; font-weight: bold; margin-top: 5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
+        
+        .container { padding: 15px; max-width: 600px; margin: 0 auto; }
+        .card { background: var(--card-bg); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; transition: transform 0.2s; }
+        .card:active { transform: scale(0.98); }
+
+        .btn { border: none; padding: 14px 24px; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .btn-draw { background: linear-gradient(45deg, #ff4757, #ff6b81); color: white; box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4); }
+        .btn-blue { background: #2ed573; color: white; }
+        
+        /* 抽獎結果動畫 */
+        #resultArea { min-height: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .result-icon { font-size: 60px; margin-bottom: 10px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .result-name { font-size: 1.2em; font-weight: bold; padding: 5px 15px; border-radius: 10px; display: inline-block; border: 2px solid transparent; }
+        
+        /* 背包網格 */
+        .inventory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .inv-item { background: white; border: 2px solid #eee; border-radius: 12px; padding: 10px 5px; text-align: center; font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; }
+        .inv-icon { font-size: 24px; margin-bottom: 5px; }
+
+        /* 底部導航 */
+        .navbar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; padding: 12px 0; box-shadow: 0 -2px 20px rgba(0,0,0,0.05); z-index: 100; border-radius: 20px 20px 0 0; }
+        .nav-item { flex: 1; text-align: center; color: #a4b0be; font-size: 10px; cursor: pointer; }
+        .nav-item.active { color: #6c5ce7; font-weight: bold; }
+        .nav-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+
+        /* 登入頁 */
+        #login-page { position: fixed; top:0; left:0; width:100%; height:100%; background: #f0f2f5; z-index: 999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        input[type="text"] { padding: 15px; width: 70%; border: 2px solid #eee; border-radius: 12px; font-size: 16px; margin-bottom: 20px; text-align: center; outline: none; }
+        input[type="text"]:focus { border-color: #6c5ce7; }
+
+        @keyframes popIn { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
 
-    <div id="loadingOverlay">☁️ 連線中...</div>
-
-    <div id="page-login" class="page active">
-        <div class="card" style="margin-top: 50px;">
-            <h2>👋 歡迎來到幸運抽抽樂</h2>
-            <p>請輸入你的名字開始遊戲</p>
-            <input type="text" id="usernameInput" class="input-box" placeholder="例如：小明">
-            <button class="btn btn-blue" onclick="login()">🚀 登入 / 註冊</button>
-            <p style="font-size: 12px; color: #888;">(如果名字第一次出現，會自動幫你開新帳戶送 500 點喔！)</p>
-        </div>
+    <div id="login-page">
+        <div style="font-size: 50px; margin-bottom: 20px;">🎒</div>
+        <h2 style="color: #6c5ce7;">Hago 獎勵系統</h2>
+        <input type="text" id="usernameInput" placeholder="請輸入你的名字">
+        <button class="btn btn-blue" style="width: 80%;" onclick="login()">開始遊戲</button>
     </div>
 
     <div id="app-content" style="display: none;">
-        <div style="background: #2196F3; color: white; padding: 15px; text-align: center;">
-            <span id="displayName">玩家</span> 的錢包: 💰 <span id="userPoints">---</span>
+        
+        <div class="header">
+            <div style="font-size: 14px; opacity: 0.8;">👋 嗨，<span id="displayName">--</span></div>
+            <div class="points-box">💰 <span id="userPoints">0</span></div>
+            <div style="font-size: 12px; margin-top: 5px;">持有代幣</div>
         </div>
 
-        <div id="page-draw" class="page active">
-            <div class="card">
-                <h3>🎁 雲端抽獎機</h3>
-                <div style="font-size: 50px; margin: 20px;">❓</div>
-                <p id="drawResultText">點擊下方按鈕抽獎 (-100點)</p>
-                <button class="btn" onclick="drawGacha()">🎰 抽一次 (100點)</button>
+        <div class="container">
+            <div id="tab-draw" class="tab-content">
+                <div class="card">
+                    <div style="color: #888; font-size: 12px; margin-bottom: 10px;">✨ 試試手氣 ✨</div>
+                    <div id="resultArea">
+                        <div class="result-icon">❓</div>
+                        <div class="result-name">準備抽獎</div>
+                    </div>
+                    <div style="margin: 20px 0; height: 1px; background: #eee;"></div>
+                    <button id="drawBtn" class="btn btn-draw" onclick="drawGacha()">
+                        <span>🎰</span> 啟動轉盤 (-100)
+                    </button>
+                    <div style="margin-top: 10px; font-size: 12px; color: #999;">
+                        🧡 傳奇 5% | 💜 史詩 15% | 💙 稀有 30% | 🤍 普通 50%
+                    </div>
+                </div>
             </div>
-            
-            <div class="card">
-                 <h4>🎒 我的背包 (雲端同步)</h4>
-                 <div id="inventoryList" style="text-align: left; padding-left: 20px;">
-                     載入中...
-                 </div>
+
+            <div id="tab-bag" class="tab-content" style="display: none;">
+                <div class="card" style="min-height: 300px;">
+                    <h3>🎒 我的寶物庫</h3>
+                    <div id="inventoryList" class="inventory-grid">
+                        </div>
+                    <div id="emptyMsg" style="color:#ccc; margin-top: 50px; display:none;">背包空空的...<br>快去抽獎吧！</div>
+                </div>
             </div>
         </div>
 
         <div class="navbar">
-            <div class="nav-item active">🏠 首頁</div>
-            <div class="nav-item" onclick="logout()">🚪 登出</div>
+            <div class="nav-item active" onclick="switchTab('draw', this)">
+                <span class="nav-icon">🎰</span>抽獎
+            </div>
+            <div class="nav-item" onclick="switchTab('bag', this)">
+                <span class="nav-icon">🎒</span>背包
+            </div>
+            <div class="nav-item" onclick="logout()">
+                <span class="nav-icon">🚪</span>登出
+            </div>
         </div>
     </div>
 
     <script>
-        // 🔴 1. 貼上你的 Firebase Config (這裡一定要改！)
+        // 🔴 你的 Hago Award System 專屬金鑰 (已幫你填好！)
         const firebaseConfig = {
             apiKey: "AIzaSyA84BEQc_szhvmbVlxVR_mXnCQ0E4auqTg",
             authDomain: "hago-award-system.firebaseapp.com",
@@ -74,137 +126,162 @@
             storageBucket: "hago-award-system.firebasestorage.app",
             messagingSenderId: "959940017225",
             appId: "1:959940017225:web:85a36866320f53638f5398",
-  	    measurementId: "G-HRS8GBGJ89"
+            measurementId: "G-HRS8GBGJ89"
         };
 
-        // 2. 初始化 Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        let currentUser = null; // 記住現在是誰
-        let currentDocId = null; // 記住他在資料庫的那張紙ID
+        // --- 🌟 獎品與機率設定區 (你可以自由修改這裡！) ---
+        const prizePool = {
+            legendary: { rate: 0.05, items: ['遊樂園門票', '500元玩具', '不用做家事券'], icon: '🧡', class: 'rank-legendary', name: '傳奇' },
+            epic:      { rate: 0.15, items: ['麥當勞套餐', '挑選晚餐權', '100元零用錢'], icon: '💜', class: 'rank-epic', name: '史詩' },
+            rare:      { rate: 0.30, items: ['薯條一份', '30分鐘電視', '巧克力一條'], icon: '💙', class: 'rank-rare', name: '稀有' },
+            common:    { rate: 0.50, items: ['橡皮擦', '貼紙', '鉛筆', '好棒棒印章'], icon: '🤍', class: 'rank-common', name: '普通' }
+        };
 
-        // --- 登入系統 ---
+        let currentUser = null;
+        let currentDocId = null;
+
+        // --- 登入邏輯 ---
         async function login() {
             const name = document.getElementById('usernameInput').value.trim();
-            if (!name) return alert("請輸入名字！");
-
-            showLoading(true);
+            if (!name) return alert("請輸入名字");
+            
+            const btn = document.querySelector('#login-page button');
+            btn.innerText = "連線中...";
+            btn.disabled = true;
 
             try {
-                // 1. 去雲端找找看有沒有這個人
                 const usersRef = db.collection('users');
                 const snapshot = await usersRef.where('name', '==', name).get();
 
                 if (snapshot.empty) {
-                    // A. 沒找到 -> 新註冊
-                    const newUser = {
-                        name: name,
-                        points: 500, // 新手禮包
-                        inventory: [],
-                        createdAt: new Date() // 註冊時間
-                    };
+                    const newUser = { name: name, points: 500, inventory: [], createdAt: new Date() };
                     const docRef = await usersRef.add(newUser);
                     currentUser = newUser;
                     currentDocId = docRef.id;
-                    alert(`歡迎新朋友 ${name}！送你 500 點！`);
                 } else {
-                    // B. 找到了 -> 讀取資料
                     const doc = snapshot.docs[0];
                     currentUser = doc.data();
                     currentDocId = doc.id;
-                    alert(`歡迎回來，${name}！`);
                 }
-
-                // 進入 App
-                document.getElementById('page-login').classList.remove('active');
+                
+                document.getElementById('login-page').style.display = 'none';
                 document.getElementById('app-content').style.display = 'block';
                 updateUI();
                 
-            } catch (error) {
-                console.error("登入失敗", error);
-                alert("連線錯誤：" + error.message);
+            } catch (e) {
+                alert("連線失敗：" + e.message);
+                btn.innerText = "開始遊戲";
+                btn.disabled = false;
             }
-            showLoading(false);
         }
 
-        // --- 抽獎系統 (雲端版) ---
+        // --- 抽獎核心邏輯 (含機率) ---
         async function drawGacha() {
-            if (!currentUser || !currentDocId) return;
+            if (currentUser.points < 100) return alert("點數不足！請找家長儲值！");
+            
+            const btn = document.getElementById('drawBtn');
+            btn.disabled = true; // 防止連按
+            btn.innerText = "🎲 轉動中...";
 
-            if (currentUser.points < 100) {
-                alert("點數不足！請找管理員儲值！");
-                return;
-            }
+            // 1. 計算機率
+            const rand = Math.random(); 
+            let selectedTier = 'common';
+            
+            // 累加機率判定
+            if (rand < prizePool.legendary.rate) selectedTier = 'legendary';
+            else if (rand < prizePool.legendary.rate + prizePool.epic.rate) selectedTier = 'epic';
+            else if (rand < prizePool.legendary.rate + prizePool.epic.rate + prizePool.rare.rate) selectedTier = 'rare';
+            else selectedTier = 'common';
 
-            showLoading(true);
-
-            // 隨機抽獎邏輯 (前端簡單版)
-            const items = ['橡皮擦', '貼紙', '巧克力', '麥當勞薯條', '100元玩具'];
-            const prize = items[Math.floor(Math.random() * items.length)];
-
+            // 2. 隨機選獎品
+            const pool = prizePool[selectedTier];
+            const item = pool.items[Math.floor(Math.random() * pool.items.length)];
+            
+            // 3. 寫入資料庫
             try {
-                // 雲端交易：扣錢 + 給獎品
-                // 這裡我們直接更新資料庫
                 const userRef = db.collection('users').doc(currentDocId);
-
-                await db.runTransaction(async (transaction) => {
-                    const doc = await transaction.get(userRef);
-                    if (!doc.exists) throw "User does not exist!";
-
+                await db.runTransaction(async (t) => {
+                    const doc = await t.get(userRef);
                     const newPoints = doc.data().points - 100;
-                    if (newPoints < 0) throw "點數不足";
-
+                    if(newPoints < 0) throw "點數不足";
+                    
                     const newInventory = doc.data().inventory || [];
                     newInventory.push({
-                        name: prize,
+                        name: item,
+                        tier: selectedTier,
                         date: new Date().toISOString()
                     });
 
-                    transaction.update(userRef, { 
-                        points: newPoints,
-                        inventory: newInventory
-                    });
-                    
-                    // 更新本地顯示
+                    t.update(userRef, { points: newPoints, inventory: newInventory });
                     currentUser.points = newPoints;
                     currentUser.inventory = newInventory;
                 });
 
-                document.getElementById('drawResultText').innerText = `🎉 恭喜獲得：${prize}`;
-                updateUI();
+                // 4. 動畫
+                showResultAnim(item, selectedTier);
 
             } catch (e) {
-                console.error("交易失敗", e);
                 alert("交易失敗：" + e);
             }
-            showLoading(false);
+            
+            btn.disabled = false;
+            btn.innerHTML = "<span>🎰</span> 啟動轉盤 (-100)";
         }
 
-        // --- UI 更新 ---
+        function showResultAnim(name, tier) {
+            const area = document.getElementById('resultArea');
+            const conf = prizePool[tier];
+            
+            let count = 0;
+            const timer = setInterval(() => {
+                area.innerHTML = `<div class="result-icon">${['🎲','⭐','🎁'][count%3]}</div><div class="result-name">...</div>`;
+                count++;
+                if(count > 5) {
+                    clearInterval(timer);
+                    area.innerHTML = `
+                        <div class="result-icon" style="animation: popIn 0.5s;">${conf.icon}</div>
+                        <div class="result-name ${conf.class}">${name}</div>
+                        <div style="font-size:12px; color:#999; margin-top:5px;">${conf.name}</div>
+                    `;
+                    updateUI();
+                }
+            }, 100);
+        }
+
         function updateUI() {
             document.getElementById('displayName').innerText = currentUser.name;
             document.getElementById('userPoints').innerText = currentUser.points;
 
             const list = document.getElementById('inventoryList');
-            if (!currentUser.inventory || currentUser.inventory.length === 0) {
-                list.innerHTML = "背包空空的...";
+            const inv = currentUser.inventory || [];
+            
+            if (inv.length === 0) {
+                document.getElementById('emptyMsg').style.display = 'block';
+                list.innerHTML = '';
             } else {
-                list.innerHTML = currentUser.inventory.map(item => `
-                    <div style="border-bottom:1px solid #eee; padding:5px;">
-                        🎁 ${item.name} <span style="font-size:10px; color:#999">(${item.date.split('T')[0]})</span>
-                    </div>
-                `).join('');
+                document.getElementById('emptyMsg').style.display = 'none';
+                list.innerHTML = [...inv].reverse().map(i => {
+                    const conf = prizePool[i.tier] || prizePool.common;
+                    return `
+                    <div class="inv-item ${conf.class}">
+                        <div class="inv-icon">${conf.icon}</div>
+                        <div style="font-weight:bold;">${i.name}</div>
+                    </div>`;
+                }).join('');
             }
         }
 
-        function logout() {
-            location.reload(); // 重新整理網頁就是登出
+        function switchTab(tab, el) {
+            document.querySelectorAll('.tab-content').forEach(d => d.style.display = 'none');
+            document.getElementById('tab-' + tab).style.display = 'block';
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            el.classList.add('active');
         }
 
-        function showLoading(show) {
-            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
-        }
+        function logout() { location.reload(); }
     </script>
 </body>
 </html>
